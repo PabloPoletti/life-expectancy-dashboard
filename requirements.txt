@@ -18,8 +18,8 @@ catboost>=1.2.8
 prophet>=1.1.5
 optuna>=3.6.0
 
-# Model Interpretability (Essential)
-shap>=0.44.0
+# Model Interpretability (Basic - SHAP temporarily disabled for Python 3.13)
+# shap>=0.44.0  # Disabled until Python 3.13 support
 lime>=0.2.0.1
 
 # Advanced Visualization

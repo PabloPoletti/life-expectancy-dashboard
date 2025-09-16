@@ -160,7 +160,8 @@ class LifeExpectancyDataFetcher:
             'China': {'base': 76, 'trend': 0.3},
             'Brazil': {'base': 75, 'trend': 0.2},
             'India': {'base': 69, 'trend': 0.4},
-            'Nigeria': {'base': 54, 'trend': 0.3}
+            'Nigeria': {'base': 54, 'trend': 0.3},
+            'Argentina': {'base': 76, 'trend': 0.15}
         }
         
         sample_data = []
@@ -236,7 +237,8 @@ class LifeExpectancyDataFetcher:
                 'Brazil': 'Latin America & Caribbean',
                 'India': 'South Asia',
                 'United Kingdom': 'Europe & Central Asia',
-                'Nigeria': 'Sub-Saharan Africa'
+                'Nigeria': 'Sub-Saharan Africa',
+                'Argentina': 'Latin America & Caribbean'
             }
     
     def process_and_save_data(self, df: pd.DataFrame) -> pd.DataFrame:

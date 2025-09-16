@@ -1,0 +1,274 @@
+name: 🚀 Deploy to Streamlit Cloud
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # 🔍 Pre-deployment validation
+  validate:
+    name: 🔍 Pre-deployment Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: 🧪 Quick Health Check
+      run: |
+        echo "🧪 Running quick health checks..."
+        
+        # Test data fetcher
+        python -c "
+        from src.data_fetcher import get_life_expectancy_data
+        data = get_life_expectancy_data()
+        assert len(data) > 0, 'No data available'
+        print(f'✅ Data validation passed: {len(data)} records')
+        "
+        
+        # Test Streamlit app import
+        python -c "
+        import streamlit as st
+        import app
+        print('✅ Streamlit app imports successfully')
+        "
+        
+    - name: 📊 Generate Fresh Data
+      run: |
+        echo "📊 Ensuring fresh data for deployment..."
+        cd src
+        python data_fetcher.py
+        
+    - name: 🏗️ Test Application Build
+      run: |
+        echo "🏗️ Testing application startup..."
+        timeout 30s streamlit run app.py --server.headless=true --server.port=8502 &
+        sleep 15
+        
+        # Check if app is responding
+        curl -f http://localhost:8502/_stcore/health || {
+          echo "❌ Application failed to start"
+          exit 1
+        }
+        
+        echo "✅ Application startup test passed"
+
+  # 📦 Prepare deployment package
+  prepare:
+    name: 📦 Prepare Deployment
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🧹 Clean for Deployment
+      run: |
+        echo "🧹 Cleaning repository for deployment..."
+        
+        # Remove development files
+        rm -rf tests/
+        rm -rf .pytest_cache/
+        rm -rf htmlcov/
+        rm -f .coverage
+        rm -f coverage.xml
+        rm -f bandit-report.json
+        rm -f safety-report.json
+        
+        # Remove unnecessary config files for deployment
+        rm -f .flake8
+        rm -f pyproject.toml
+        
+        echo "✅ Repository cleaned for deployment"
+        
+    - name: 📝 Create Deployment Info
+      run: |
+        echo "📝 Creating deployment information..."
+        
+        cat > deployment_info.json << EOF
+        {
+          "deployment_time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "git_commit": "${{ github.sha }}",
+          "git_branch": "${{ github.ref_name }}",
+          "environment": "${{ github.event.inputs.environment || 'production' }}",
+          "version": "1.0.0"
+        }
+        EOF
+        
+        echo "✅ Deployment info created"
+        
+    - name: 📤 Upload Deployment Package
+      uses: actions/upload-artifact@v3
+      with:
+        name: streamlit-deployment-package
+        path: |
+          .
+          !.git/
+        retention-days: 7
+
+  # 🌐 Deploy to Streamlit Cloud
+  deploy:
+    name: 🌐 Deploy to Streamlit Cloud
+    runs-on: ubuntu-latest
+    needs: prepare
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    steps:
+    - name: 📥 Download Deployment Package
+      uses: actions/download-artifact@v3
+      with:
+        name: streamlit-deployment-package
+        path: .
+        
+    - name: 🚀 Deploy to Streamlit Cloud
+      run: |
+        echo "🚀 Deploying to Streamlit Cloud..."
+        echo "Environment: ${{ github.event.inputs.environment || 'production' }}"
+        echo "Commit: ${{ github.sha }}"
+        
+        # Note: Streamlit Cloud deploys automatically from GitHub
+        # This step documents the deployment process
+        
+        if [ "${{ github.event.inputs.environment || 'production' }}" = "production" ]; then
+          echo "📍 Production URL: https://life-expectancy-dashboard.streamlit.app"
+          DEPLOY_URL="https://life-expectancy-dashboard.streamlit.app"
+        else
+          echo "📍 Staging URL: https://staging-life-expectancy-dashboard.streamlit.app"
+          DEPLOY_URL="https://staging-life-expectancy-dashboard.streamlit.app"
+        fi
+        
+        echo "DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_ENV
+        
+        echo "✅ Deployment configuration updated"
+
+  # 🔍 Post-deployment validation
+  validate-deployment:
+    name: 🔍 Post-deployment Validation
+    runs-on: ubuntu-latest
+    needs: deploy
+    
+    steps:
+    - name: ⏰ Wait for Deployment
+      run: |
+        echo "⏰ Waiting for deployment to be ready..."
+        sleep 60  # Give Streamlit Cloud time to deploy
+        
+    - name: 🔍 Health Check
+      run: |
+        echo "🔍 Running post-deployment health checks..."
+        
+        # Note: Replace with actual deployment URL
+        DEPLOY_URL="${{ env.DEPLOY_URL || 'https://life-expectancy-dashboard.streamlit.app' }}"
+        
+        echo "Checking: $DEPLOY_URL"
+        
+        # Basic connectivity check
+        for i in {1..5}; do
+          if curl -f -s --max-time 30 "$DEPLOY_URL" > /dev/null; then
+            echo "✅ Deployment is responding (attempt $i)"
+            break
+          else
+            echo "⏳ Waiting for deployment... (attempt $i/5)"
+            sleep 30
+          fi
+          
+          if [ $i -eq 5 ]; then
+            echo "❌ Deployment health check failed after 5 attempts"
+            exit 1
+          fi
+        done
+        
+        echo "✅ Deployment validation completed successfully"
+
+  # 📢 Notify deployment status
+  notify:
+    name: 📢 Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [validate, prepare, deploy, validate-deployment]
+    if: always()
+    
+    steps:
+    - name: 📢 Deployment Success Notification
+      if: ${{ needs.validate-deployment.result == 'success' }}
+      run: |
+        echo "🎉 Deployment completed successfully!"
+        echo "🌍 Dashboard URL: ${{ env.DEPLOY_URL || 'https://life-expectancy-dashboard.streamlit.app' }}"
+        echo "🔧 Environment: ${{ github.event.inputs.environment || 'production' }}"
+        echo "📝 Commit: ${{ github.sha }}"
+        echo "📅 Time: $(date -u)"
+        
+        # Here you could add integrations with:
+        # - Slack notifications
+        # - Discord webhooks  
+        # - Email notifications
+        # - Teams notifications
+        
+    - name: ❌ Deployment Failure Notification
+      if: ${{ needs.validate-deployment.result == 'failure' || needs.deploy.result == 'failure' }}
+      run: |
+        echo "❌ Deployment failed!"
+        echo "🔧 Environment: ${{ github.event.inputs.environment || 'production' }}"
+        echo "📝 Commit: ${{ github.sha }}"
+        echo "📅 Time: $(date -u)"
+        echo "🔍 Check the logs for details"
+        
+        # Send failure notifications
+        exit 1
+
+  # 📊 Performance monitoring
+  monitor:
+    name: 📊 Performance Monitoring
+    runs-on: ubuntu-latest
+    needs: validate-deployment
+    if: ${{ needs.validate-deployment.result == 'success' }}
+    
+    steps:
+    - name: 📊 Basic Performance Check
+      run: |
+        echo "📊 Running basic performance monitoring..."
+        
+        DEPLOY_URL="${{ env.DEPLOY_URL || 'https://life-expectancy-dashboard.streamlit.app' }}"
+        
+        # Measure response time
+        start_time=$(date +%s.%N)
+        curl -f -s --max-time 30 "$DEPLOY_URL" > /dev/null
+        end_time=$(date +%s.%N)
+        
+        response_time=$(echo "$end_time - $start_time" | bc -l)
+        response_time_ms=$(echo "$response_time * 1000" | bc -l)
+        
+        echo "⏱️ Response time: ${response_time_ms} ms"
+        
+        # Performance thresholds
+        if (( $(echo "$response_time > 10" | bc -l) )); then
+          echo "⚠️ Warning: Response time is high (${response_time_ms} ms)"
+        else
+          echo "✅ Response time is acceptable"
+        fi
+        
+        echo "✅ Performance monitoring completed"

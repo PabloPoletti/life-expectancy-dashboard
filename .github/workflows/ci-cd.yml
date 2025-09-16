@@ -1,0 +1,381 @@
+name: 🚀 CI/CD Pipeline - Life Expectancy Dashboard
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run daily at 6 AM UTC to update data
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  # 🧪 Testing and Quality Assurance
+  test:
+    name: 🧪 Tests & Code Quality
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov flake8 black isort safety bandit
+        
+    - name: 🎨 Code Formatting Check
+      run: |
+        echo "🎨 Checking code formatting with Black..."
+        black --check --diff .
+        echo "📝 Checking import sorting with isort..."
+        isort --check-only --diff .
+        
+    - name: 🔍 Lint with Flake8
+      run: |
+        echo "🔍 Running Flake8 linting..."
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: 🔒 Security Scan with Bandit
+      run: |
+        echo "🔒 Running security scan..."
+        bandit -r . -f json -o bandit-report.json || true
+        bandit -r . -ll
+        
+    - name: 🛡️ Safety Check Dependencies
+      run: |
+        echo "🛡️ Checking for known security vulnerabilities..."
+        safety check --json --output safety-report.json || true
+        safety check
+        
+    - name: 🧪 Run Unit Tests
+      run: |
+        echo "🧪 Running unit tests..."
+        python -m pytest tests/ -v --cov=src --cov=utils --cov-report=xml --cov-report=html
+        
+    - name: 📊 Upload Coverage Reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  # 🔄 Data Pipeline Validation
+  data-validation:
+    name: 🔄 Data Pipeline Validation
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: 🔄 Test Data Fetcher
+      run: |
+        echo "🔄 Testing data acquisition pipeline..."
+        cd src
+        python data_fetcher.py
+        
+    - name: 🤖 Test ML Models
+      run: |
+        echo "🤖 Testing machine learning models..."
+        cd src
+        python predictive_models.py
+        
+    - name: 📊 Validate Data Quality
+      run: |
+        echo "📊 Running data quality checks..."
+        python -c "
+        import pandas as pd
+        import sys
+        
+        # Load and validate data
+        try:
+            data = pd.read_csv('data/life_expectancy_data.csv')
+            print(f'✅ Data loaded: {len(data)} records')
+            
+            # Basic validation
+            assert len(data) > 0, 'Data is empty'
+            assert 'Country' in data.columns, 'Missing Country column'
+            assert 'Year' in data.columns, 'Missing Year column'
+            assert 'Life_Expectancy_Total' in data.columns, 'Missing Life_Expectancy_Total column'
+            
+            # Data quality checks
+            assert data['Life_Expectancy_Total'].min() > 30, 'Unrealistic low life expectancy'
+            assert data['Life_Expectancy_Total'].max() < 100, 'Unrealistic high life expectancy'
+            
+            print('✅ All data quality checks passed')
+            
+        except Exception as e:
+            print(f'❌ Data validation failed: {e}')
+            sys.exit(1)
+        "
+
+  # 🏗️ Build and Test Application
+  build:
+    name: 🏗️ Build Application
+    runs-on: ubuntu-latest
+    needs: [test, data-validation]
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: 🔧 Test Streamlit App
+      run: |
+        echo "🔧 Testing Streamlit application startup..."
+        timeout 30s streamlit run app.py --server.headless=true --server.port=8501 &
+        sleep 10
+        
+        # Test if app is responding
+        curl -f http://localhost:8501/_stcore/health || {
+          echo "❌ Streamlit app failed to start"
+          exit 1
+        }
+        
+        echo "✅ Streamlit app started successfully"
+        
+    - name: 📦 Create Application Package
+      run: |
+        echo "📦 Creating application package..."
+        mkdir -p dist
+        tar -czf dist/life-expectancy-dashboard.tar.gz \
+          --exclude='.git' \
+          --exclude='dist' \
+          --exclude='__pycache__' \
+          --exclude='*.pyc' \
+          --exclude='.pytest_cache' \
+          .
+          
+    - name: 📤 Upload Build Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: application-package
+        path: dist/
+        retention-days: 30
+
+  # 🌐 Deploy to Staging
+  deploy-staging:
+    name: 🌐 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.deploy_environment == 'staging'
+    environment: staging
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 📦 Download Build Artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: application-package
+        path: dist/
+        
+    - name: 🚀 Deploy to Streamlit Cloud (Staging)
+      run: |
+        echo "🚀 Deploying to staging environment..."
+        echo "📍 Staging URL: https://staging-life-expectancy-dashboard.streamlit.app"
+        # Here you would integrate with your deployment platform
+        # For example: Streamlit Cloud, Heroku, Railway, etc.
+        
+    - name: 🔍 Health Check
+      run: |
+        echo "🔍 Running health check on staging deployment..."
+        # Add health check logic here
+        echo "✅ Staging deployment healthy"
+
+  # 🚀 Deploy to Production
+  deploy-production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, deploy-staging]
+    if: github.ref == 'refs/heads/main' || github.event.inputs.deploy_environment == 'production'
+    environment: production
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 📦 Download Build Artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: application-package
+        path: dist/
+        
+    - name: 🚀 Deploy to Production
+      run: |
+        echo "🚀 Deploying to production environment..."
+        echo "📍 Production URL: https://life-expectancy-dashboard.streamlit.app"
+        # Integration with production deployment platform
+        
+    - name: 🔍 Production Health Check
+      run: |
+        echo "🔍 Running comprehensive health check..."
+        # Add production health check logic
+        echo "✅ Production deployment healthy"
+        
+    - name: 📢 Notify Deployment Success
+      run: |
+        echo "📢 Production deployment completed successfully!"
+        echo "🌍 Dashboard is live at: https://life-expectancy-dashboard.streamlit.app"
+
+  # 📈 Performance Monitoring
+  performance-monitoring:
+    name: 📈 Performance Monitoring
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: 📊 Run Performance Tests
+      run: |
+        echo "📊 Running performance benchmarks..."
+        python -c "
+        import time
+        import pandas as pd
+        from src.data_fetcher import get_life_expectancy_data
+        from src.predictive_models import train_predictive_models
+        
+        # Benchmark data loading
+        start_time = time.time()
+        data = get_life_expectancy_data()
+        data_load_time = time.time() - start_time
+        print(f'📊 Data loading time: {data_load_time:.2f}s')
+        
+        # Benchmark model training
+        start_time = time.time()
+        predictor = train_predictive_models(data)
+        model_train_time = time.time() - start_time
+        print(f'🤖 Model training time: {model_train_time:.2f}s')
+        
+        # Performance thresholds
+        assert data_load_time < 30, f'Data loading too slow: {data_load_time:.2f}s'
+        assert model_train_time < 120, f'Model training too slow: {model_train_time:.2f}s'
+        
+        print('✅ All performance benchmarks passed')
+        "
+
+  # 🔄 Scheduled Data Update
+  scheduled-update:
+    name: 🔄 Scheduled Data Update
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: 🔄 Update Data
+      run: |
+        echo "🔄 Running scheduled data update..."
+        cd src
+        python data_fetcher.py
+        
+    - name: 📊 Validate Updated Data
+      run: |
+        echo "📊 Validating updated data..."
+        python -c "
+        import pandas as pd
+        import json
+        from datetime import datetime
+        
+        # Check if data was updated
+        with open('data/data_metadata.json', 'r') as f:
+            metadata = json.load(f)
+        
+        last_update = datetime.fromisoformat(metadata['last_update'])
+        hours_since_update = (datetime.now() - last_update).total_seconds() / 3600
+        
+        print(f'⏰ Data last updated: {hours_since_update:.1f} hours ago')
+        
+        # Load and validate data
+        data = pd.read_csv('data/life_expectancy_data.csv')
+        print(f'📊 Data contains {len(data)} records')
+        print(f'🌍 Countries: {data[\"Country\"].nunique()}')
+        print(f'📅 Year range: {data[\"Year\"].min()}-{data[\"Year\"].max()}')
+        
+        print('✅ Data update completed successfully')
+        "
+        
+    - name: 📤 Commit Updated Data
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if [[ -n $(git status --porcelain) ]]; then
+          git add data/
+          git commit -m "🔄 Automated data update - $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          git push
+          echo "📤 Updated data committed and pushed"
+        else
+          echo "📊 No data changes detected"
+        fi

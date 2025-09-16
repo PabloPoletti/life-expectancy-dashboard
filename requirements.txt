@@ -1,66 +1,44 @@
-# Life Expectancy Dashboard - State-of-the-Art Dependencies
+# Life Expectancy Dashboard - Streamlit Cloud Compatible (2025)
 streamlit>=1.49.0
 pandas>=2.3.0
 plotly>=6.0.0
 requests>=2.32.0
-numpy>=2.0.0
+numpy>=1.26.0
 openpyxl>=3.1.0
 altair>=5.5.0
-pillow>=11.0.0
+pillow>=10.0.0
 python-dotenv>=1.1.0
 wbdata>=0.3.0
 
-# Cutting-Edge ML Libraries (2025)
-scikit-learn>=1.7.0
+# Core ML Libraries (Streamlit Cloud Compatible)
+scikit-learn>=1.5.0
 xgboost>=3.0.0
-lightgbm>=4.6.0
-catboost>=1.4.0
-prophet>=1.1.7
-optuna>=4.5.0
+lightgbm>=4.5.0
+catboost>=1.2.8
+prophet>=1.1.5
+optuna>=3.6.0
 
-# Advanced Ensemble & Meta-Learning
-mlxtend>=0.23.0
-stacking-ensemble>=0.1.0
-
-# Model Interpretability & Explainability
-shap>=0.45.0
+# Model Interpretability (Essential)
+shap>=0.44.0
 lime>=0.2.0.1
-eli5>=0.13.0
-feature-engine>=1.8.0
 
-# Advanced Time Series
-sktime>=0.30.0
-darts>=0.30.0
-neuralprophet>=0.9.0
+# Advanced Visualization
+seaborn>=0.13.0
+matplotlib>=3.8.0
 
-# Hyperparameter Optimization & AutoML
-hyperopt>=0.2.7
-bayesian-optimization>=1.5.0
-auto-sklearn>=0.15.0
+# Statistical Analysis
+scipy>=1.11.0
+statsmodels>=0.14.0
 
-# Advanced Visualization & Dashboards
-streamlit-aggrid>=1.0.0
-streamlit-plotly-events>=0.0.6
-streamlit-option-menu>=0.4.0
-plotly-dash>=2.18.0
-
-# Advanced Statistical Analysis
-scipy>=1.16.0
-statsmodels>=0.14.5
-pingouin>=0.5.5
-arch>=7.0.0
-
-# Performance & Monitoring
-psutil>=6.0.0
-memory-profiler>=0.61.0
-line-profiler>=4.1.0
-
-# Data Quality & Validation
-great-expectations>=1.0.0
-pandera>=0.20.0
-evidently>=0.4.0
-
-# Advanced Feature Engineering
-featuretools>=1.35.0
+# Feature Engineering
 category-encoders>=2.6.0
-imbalanced-learn>=0.12.0
+imbalanced-learn>=0.11.0
+
+# Time Series (Lightweight)
+sktime>=0.26.0
+
+# Performance Monitoring (Lightweight)
+psutil>=5.9.0
+
+# Streamlit Enhancements
+streamlit-option-menu>=0.3.0

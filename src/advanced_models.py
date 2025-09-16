@@ -27,18 +27,18 @@ import xgboost as xgb
 import lightgbm as lgb
 try:
     import catboost as cb
+    print(f"✅ CatBoost version: {cb.__version__}")
 except ImportError:
     cb = None
     print("⚠️ CatBoost not available. Install with: pip install catboost")
 
 # Advanced Optimization
 import optuna
-from bayesian_optimization import BayesianOptimization
 try:
-    import hyperopt
-    from hyperopt import hp, fmin, tpe, Trials
+    from bayesian_optimization import BayesianOptimization
 except ImportError:
-    hyperopt = None
+    BayesianOptimization = None
+    print("⚠️ Bayesian Optimization not available in Streamlit Cloud")
 
 # Model Interpretability
 try:
@@ -47,24 +47,18 @@ except ImportError:
     shap = None
     print("⚠️ SHAP not available. Install with: pip install shap")
 
-# Advanced Time Series
+# Advanced Time Series (Streamlit Cloud Compatible)
 try:
     from neuralprophet import NeuralProphet
 except ImportError:
     NeuralProphet = None
-    print("⚠️ NeuralProphet not available. Install with: pip install neuralprophet")
+    print("⚠️ NeuralProphet not available in Streamlit Cloud")
 
+# Feature Engineering (Basic)
 try:
-    from darts import TimeSeries
-    from darts.models import ExponentialSmoothing as DartsES, AutoARIMA, RandomForest as DartsRF
+    from category_encoders import TargetEncoder
 except ImportError:
-    pass
-
-# Feature Engineering
-try:
-    from featuretools import dfs
-except ImportError:
-    dfs = None
+    TargetEncoder = None
 
 # Performance Monitoring
 import time
@@ -203,49 +197,40 @@ class AdvancedLifeExpectancyPredictor:
         print(f"✅ Created {len(df.columns) - len(data.columns)} new advanced features")
         return df
     
-    def optimize_catboost_bayesian(self, X_train: np.ndarray, y_train: np.ndarray, 
-                                 X_val: np.ndarray, y_val: np.ndarray, n_calls: int = 50) -> Dict:
+    def optimize_catboost_optuna(self, X_train: np.ndarray, y_train: np.ndarray, 
+                                X_val: np.ndarray, y_val: np.ndarray, n_trials: int = 30) -> Dict:
         """
-        Optimize CatBoost using Bayesian Optimization.
+        Optimize CatBoost using Optuna (Streamlit Cloud compatible).
         """
         if cb is None:
-            raise ImportError("CatBoost not available")
+            print("⚠️ CatBoost not available, using default parameters")
+            return {
+                'iterations': 300,
+                'depth': 6,
+                'learning_rate': 0.1,
+                'l2_leaf_reg': 3,
+                'border_count': 128
+            }
         
-        def catboost_objective(**params):
-            """Objective function for Bayesian optimization."""
-            model = cb.CatBoostRegressor(
-                iterations=int(params['iterations']),
-                depth=int(params['depth']),
-                learning_rate=params['learning_rate'],
-                l2_leaf_reg=params['l2_leaf_reg'],
-                border_count=int(params['border_count']),
-                verbose=False,
-                random_state=42,
-                gpu_device_id=0 if self.use_gpu else -1
-            )
+        def objective(trial):
+            params = {
+                'iterations': trial.suggest_int('iterations', 100, 500),
+                'depth': trial.suggest_int('depth', 4, 8),
+                'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+                'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1, 10),
+                'verbose': False,
+                'random_state': 42
+            }
             
+            model = cb.CatBoostRegressor(**params)
             model.fit(X_train, y_train, eval_set=(X_val, y_val), verbose=False)
             predictions = model.predict(X_val)
-            return -mean_absolute_error(y_val, predictions)  # Negative because we want to maximize
+            return mean_absolute_error(y_val, predictions)
         
-        # Define search space
-        pbounds = {
-            'iterations': (100, 1000),
-            'depth': (4, 10),
-            'learning_rate': (0.01, 0.3),
-            'l2_leaf_reg': (1, 10),
-            'border_count': (32, 255)
-        }
+        study = optuna.create_study(direction='minimize')
+        study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
         
-        optimizer = BayesianOptimization(
-            f=catboost_objective,
-            pbounds=pbounds,
-            random_state=42
-        )
-        
-        optimizer.maximize(init_points=10, n_iter=n_calls)
-        
-        return optimizer.max['params']
+        return study.best_params
     
     def train_neural_prophet(self, data: pd.DataFrame, country: str) -> Optional[object]:
         """
@@ -462,21 +447,20 @@ class AdvancedLifeExpectancyPredictor:
         
         results = {}
         
-        # Train CatBoost with Bayesian optimization
+        # Train CatBoost with Optuna optimization
         if cb is not None:
-            print("  🐱 Training CatBoost with Bayesian optimization...")
+            print("  🐱 Training CatBoost with Optuna optimization...")
             try:
                 if optimize:
-                    best_params = self.optimize_catboost_bayesian(
-                        X_train_scaled, y_train, X_test_scaled, y_test, n_calls=30
+                    best_params = self.optimize_catboost_optuna(
+                        X_train_scaled, y_train, X_test_scaled, y_test, n_trials=20
                     )
                 else:
                     best_params = {
                         'iterations': 300,
                         'depth': 6,
                         'learning_rate': 0.1,
-                        'l2_leaf_reg': 3,
-                        'border_count': 128
+                        'l2_leaf_reg': 3
                     }
                 
                 catboost_model = cb.CatBoostRegressor(

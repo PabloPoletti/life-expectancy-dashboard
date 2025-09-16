@@ -139,14 +139,14 @@ life-expectancy-dashboard/
   - Built-in cross-validation with early stopping
 - **📊 Performance**: Typically achieves R² > 0.99 on life expectancy data
 
-#### **CatBoost 1.4+ (Categorical Boosting)**
+#### **CatBoost 1.2.8+ (Categorical Boosting)**
 - **🎯 Use Case**: Superior handling of categorical features without encoding
 - **🔧 Advanced Features**:
   - Automatic categorical feature processing
   - Symmetric tree structure for reduced overfitting
-  - GPU training with CUDA acceleration
+  - Production-stable version for cloud deployment
   - Built-in feature selection
-- **📊 Innovation**: Yandex's proprietary algorithm for categorical data
+- **📊 Innovation**: Yandex's proprietary algorithm for categorical data (Streamlit Cloud compatible)
 
 #### **Neural Prophet (Facebook Research)**
 - **🎯 Use Case**: Deep learning-based time series forecasting

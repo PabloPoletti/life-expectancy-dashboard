@@ -4,6 +4,8 @@
 
 An advanced, production-ready dashboard leveraging cutting-edge ML techniques for life expectancy prediction and analysis. Built with enterprise-grade architecture, featuring automated model optimization, interpretable AI, and real-time data processing.
 
+**🚀 [Ver Dashboard en Vivo](https://life-expectancy-dashboard.streamlit.app/)**
+
 ![Live Dashboard](https://img.shields.io/badge/🌐_Live_Dashboard-life--expectancy--dashboard.streamlit.app-FF4B4B?style=for-the-badge)
 ![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776ab?style=for-the-badge&logo=python&logoColor=white)
 ![Advanced ML](https://img.shields.io/badge/ML-XGBoost_3.0_|_CatBoost_|_Neural_Prophet-00D4AA?style=for-the-badge)
@@ -314,12 +316,22 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **XGBoost** and **LightGBM** communities for powerful ML libraries
 - **Plotly** for interactive visualization capabilities
 
-## 📞 Support
+## 👥 Autor
 
-- **Documentation**: Check the inline help and tooltips
-- **Issues**: Report bugs on GitHub Issues
-- **Discussions**: Join community discussions
-- **Email**: Contact the development team
+- **Pablo Poletti** - *Desarrollo inicial* - [@PabloPoletti](https://github.com/PabloPoletti)
+
+## 🔗 Proyectos Relacionados
+
+- **[Argentina Economic Dashboard](https://github.com/PabloPoletti/argentina-economic-dashboard)** - Dashboard de series económicas ([🚀 En Vivo](https://argentina-economic-dashboard.streamlit.app/))
+- **[SeriesEcon Original](https://github.com/PabloPoletti/seriesecon)** - Versión original del dashboard económico
+- **[Precios Argentina](https://github.com/PabloPoletti/Precios1)** - Dashboard de análisis de precios
+
+## 📞 Contacto
+
+- **📧 Email**: lic.poletti@gmail.com
+- **💼 LinkedIn**: [Pablo Poletti](https://www.linkedin.com/in/pablom-poletti/)
+- **🐛 Issues**: [GitHub Issues](https://github.com/PabloPoletti/esperanza-vida-2/issues)
+- **💬 GitHub**: [@PabloPoletti](https://github.com/PabloPoletti)
 
 ---
 
